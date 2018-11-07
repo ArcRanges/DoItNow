@@ -2,19 +2,24 @@ import React from 'react';
 import {
   Image,
   Platform,
-  ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
+  Alert,
+  TouchableHighlight,
+  Dimensions
 } from 'react-native';
 
 import { WebBrowser } from 'expo';
 
-import { Header } from 'react-native-elements';
+import { Header, Icon, Button, FormLabel, FormInput, FormValidationMessage } from 'react-native-elements';
+import Modal from 'react-native-modal';
 import Accordion from 'react-native-collapsible/Accordion';
 
 import { MonoText } from '../components/StyledText';
+
+const width = Dimensions.get('window').width;
+const height = Dimensions.get('window').height;
 
 const SECTIONS = [
   {
@@ -77,16 +82,73 @@ export default class HomeScreen extends React.Component {
     header: null,
   };
 
+  constructor(props){
+    super(props);
+    this.state = {
+      modalVisible: true,
+      error: ['','','','']
+    }
+
+    this.addNewEntry = this.addNewEntry.bind(this);
+  }
+
+  addNewEntry() {
+    // Alert.alert('Adding a new entre');
+    // console.log('entra');
+    this.setState({
+      modalVisible: true,
+    });
+  }
+
   render() {
     return (
       <View style={styles.container}>
         <Header
-          centerComponent={{ text: 'Upcoming', style: { color: '#fff' } }}
-          rightComponent={{ icon: 'add', color: '#fff' }}
+          centerComponent={{ text: 'UPCOMING', style: { color: '#fff', fontSize: 20 } }}
+          rightComponent={<Icon
+                            name="plus"
+                            color="white"
+                            size={18}
+                            type="font-awesome"
+                            onPress={() => this.addNewEntry()} />}
         />
 
         <AccordionView/>
 
+        <Modal
+          isVisible={this.state.modalVisible}
+          onBackdropPress={()=> this.setState({modalVisible: !this.state.modalVisible})}
+          >
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                Add Entry
+              </Text>
+            </View>
+            <View style={styles.modalContent}>
+              <FormLabel>Date</FormLabel>
+              <FormInput inputStyle={styles.inputStyle} onChangeText={()=> console.log('changed')}/>
+              <FormValidationMessage>{this.state.error[0]}</FormValidationMessage>
+              <FormLabel>Title</FormLabel>
+              <FormInput inputStyle={styles.inputStyle} onChangeText={()=> console.log('changed')}/>
+              <FormValidationMessage>{this.state.error[1]}</FormValidationMessage>
+              <FormLabel>Location</FormLabel>
+              <FormInput inputStyle={styles.inputStyle} onChangeText={()=> console.log('changed')}/>
+              <FormValidationMessage>{this.state.error[2]}</FormValidationMessage>
+              <FormLabel>Description</FormLabel>
+              <FormInput inputStyle={styles.inputStyle} onChangeText={()=> console.log('changed')}/>
+              <FormValidationMessage>{this.state.error[3]}</FormValidationMessage>
+            </View>
+            <View style={styles.modalFooter}>
+              <Button
+                raised
+                backgroundColor="rgb(90, 200, 250)"
+                icon={{name: 'save', type:'font-awesome', buttonStyle: styles.submitButtonStyle}}
+                title='SUBMIT'
+              />
+            </View>
+          </View>
+        </Modal>
       </View>
     );
   }
@@ -138,15 +200,45 @@ const styles = StyleSheet.create({
   header: {
    backgroundColor: '#F5FCFF',
    padding: 10,
- },
- headerText: {
+  },
+  headerText: {
    textAlign: 'left',
    fontSize: 16,
    fontWeight: '500',
- },
- content: {
+  },
+  content: {
    padding: 20,
    backgroundColor: '#fff',
- },
-
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'white',
+    alignItems: 'center',
+    borderRadius: 10,
+  },
+  modalHeader: {
+    flex: 1,
+    maxHeight: 40,
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgb(0,122,255)',
+  },
+  modalTitle: {
+    color: 'white',
+    fontSize: 24
+  },
+  modalContent: {
+    flex: 4,
+    alignItems: 'center'
+  },
+  modalFooter: {
+    flex: 1,
+    alignItems: 'flex-end'
+  },
+  inputStyle: {
+    maxWidth: 225,
+  }
 });
