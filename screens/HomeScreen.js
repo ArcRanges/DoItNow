@@ -7,12 +7,17 @@ import {
   View,
   Alert,
   TouchableHighlight,
-  Dimensions
+  Dimensions,
+  ScrollView,
+  RefreshControl,
+  AsyncStorage
 } from 'react-native';
 
 import { WebBrowser } from 'expo';
 
 import { Header, Icon, Button, FormLabel, FormInput, FormValidationMessage } from 'react-native-elements';
+import DateTimePicker from 'react-native-modal-datetime-picker';
+
 import Modal from 'react-native-modal';
 import Accordion from 'react-native-collapsible/Accordion';
 
@@ -33,14 +38,43 @@ const SECTIONS = [
 ];
 
 class AccordionView extends React.Component {
-  state = {
-    activeSections: []
-  };
+
+  constructor(props) {
+    super(props);
+
+    this.state = {
+      sections: [],
+      activeSections: [],
+      refreshing: false,
+    }
+  }
+
+  componentWillMount() {
+
+    this.loadEntries();
+  }
+
+  loadEntries = async () => {
+
+    await AsyncStorage.getItem('entries').then((data) => {
+      // console.log(JSON.parse(data));
+
+      if (data) {
+        console.log(JSON.parse(data));
+        this.setState({
+          sections: JSON.parse(data),
+        });
+      }
+
+    }).catch((err) => {
+      console.log('error loading entries ' + err);
+    });
+  }
 
   _renderSectionTitle = section => {
     return (
       <View style={styles.content}>
-        <Text>{section.content}</Text>
+        <Text>{section.location}</Text>
       </View>
     );
   };
@@ -48,7 +82,7 @@ class AccordionView extends React.Component {
   _renderHeader = section => {
     return (
       <View style={styles.header}>
-        <Text style={styles.headerText}>{section.title}</Text>
+        <Text style={styles.headerText}>{section.location}</Text>
       </View>
     );
   };
@@ -56,7 +90,8 @@ class AccordionView extends React.Component {
   _renderContent = section => {
     return (
       <View style={styles.content}>
-        <Text>{section.content}</Text>
+        <Text>Due: {section.date}</Text>
+        <Text>Notes: {section.description}</Text>
       </View>
     );
   };
@@ -67,13 +102,22 @@ class AccordionView extends React.Component {
 
   render() {
     return (
-      <Accordion
-        sections={SECTIONS}
-        activeSections={this.state.activeSections}
-        renderHeader={this._renderHeader}
-        renderContent={this._renderContent}
-        onChange={this._updateSections}
-      />
+      <ScrollView
+        refreshControl={
+          <RefreshControl
+            refreshing={this.props.refreshing}
+            onRefresh={this.loadEntries}
+          />
+          }
+        >
+        <Accordion
+          sections={this.state.sections}
+          activeSections={this.state.activeSections}
+          renderHeader={this._renderHeader}
+          renderContent={this._renderContent}
+          onChange={this._updateSections}
+        />
+      </ScrollView>
     );
   }
 }
@@ -85,20 +129,96 @@ export default class HomeScreen extends React.Component {
   constructor(props){
     super(props);
     this.state = {
-      modalVisible: true,
-      error: ['','','','']
+      modalVisible: false,
+
+      entries: [],
+      error: ['','','',''],
+      isDateTimePickerVisible: false,
+
+      pickedDate: '',
+      converted_date: '',
+      title: '',
+      location: '',
+      description: '',
+
+      refreshing: false,
     }
 
     this.addNewEntry = this.addNewEntry.bind(this);
   }
 
   addNewEntry() {
-    // Alert.alert('Adding a new entre');
-    // console.log('entra');
     this.setState({
       modalVisible: true,
+      refreshing: true,
     });
   }
+
+  _saveEntry = async () => {
+    this.setState({
+      refreshing: true
+    });
+
+    const entry = {
+      'date': this.state.pickedDate,
+      'title:': this.state.title,
+      'location': this.state.location,
+      'description': this.state.description
+    }
+
+    const currentEntries = await AsyncStorage.getItem('entries');
+
+    let newEntries = JSON.parse(currentEntries);
+
+    if ( !newEntries ) {
+      newEntries = [];
+    }
+
+    // console.log(newEntries);
+
+    newEntries.push(entry);
+
+    await AsyncStorage.setItem('entries', JSON.stringify(newEntries)).then(()=> {
+      console.log('Successfully saved entry');
+      setTimeout(()=> {
+        this.setState({
+          pickedDate: '',
+          title: '',
+          description: '',
+          location: '',
+          converted_date: '',
+          modalVisible: false,
+          refreshing: false,
+        });
+      },1000);
+
+
+    }).catch(()=> {
+      console.log('There was an error saving the entry');
+    });
+  }
+
+  _showDateTimePicker = () => this.setState({ isDateTimePickerVisible: true });
+
+  _hideDateTimePicker = () => this.setState({ isDateTimePickerVisible: false });
+
+  _handleDatePicked = (date) => {
+    console.log('A date has been picked: ', date);
+    this._hideDateTimePicker();
+
+    // convert date to readable format
+    let c_date = new Intl.DateTimeFormat('en-GB', {
+      year: 'numeric',
+      month: 'long',
+      day: '2-digit'
+    }).format(date);
+
+    this.setState({
+      converted_date: c_date,
+      pickedDate: date
+    });
+
+  };
 
   render() {
     return (
@@ -113,7 +233,7 @@ export default class HomeScreen extends React.Component {
                             onPress={() => this.addNewEntry()} />}
         />
 
-        <AccordionView/>
+        <AccordionView refreshing={this.state.refreshing}/>
 
         <Modal
           isVisible={this.state.modalVisible}
@@ -127,16 +247,24 @@ export default class HomeScreen extends React.Component {
             </View>
             <View style={styles.modalContent}>
               <FormLabel>Date</FormLabel>
-              <FormInput inputStyle={styles.inputStyle} onChangeText={()=> console.log('changed')}/>
+              <FormInput
+                inputStyle={styles.inputStyle}
+                onFocus={this._showDateTimePicker}
+                placeholder={this.state.converted_date}/>
+              <DateTimePicker
+                isVisible={this.state.isDateTimePickerVisible}
+                onConfirm={this._handleDatePicked}
+                onCancel={this._hideDateTimePicker}
+              />
               <FormValidationMessage>{this.state.error[0]}</FormValidationMessage>
               <FormLabel>Title</FormLabel>
-              <FormInput inputStyle={styles.inputStyle} onChangeText={()=> console.log('changed')}/>
+              <FormInput inputStyle={styles.inputStyle} onChangeText={(input)=> this.setState({title: input})}/>
               <FormValidationMessage>{this.state.error[1]}</FormValidationMessage>
               <FormLabel>Location</FormLabel>
-              <FormInput inputStyle={styles.inputStyle} onChangeText={()=> console.log('changed')}/>
+              <FormInput inputStyle={styles.inputStyle} onChangeText={(input)=> this.setState({location: input})}/>
               <FormValidationMessage>{this.state.error[2]}</FormValidationMessage>
               <FormLabel>Description</FormLabel>
-              <FormInput inputStyle={styles.inputStyle} onChangeText={()=> console.log('changed')}/>
+              <FormInput inputStyle={styles.inputStyle} onChangeText={(input)=> this.setState({description: input})}/>
               <FormValidationMessage>{this.state.error[3]}</FormValidationMessage>
             </View>
             <View style={styles.modalFooter}>
@@ -145,6 +273,7 @@ export default class HomeScreen extends React.Component {
                 backgroundColor="rgb(90, 200, 250)"
                 icon={{name: 'save', type:'font-awesome', buttonStyle: styles.submitButtonStyle}}
                 title='SUBMIT'
+                onPress={this._saveEntry}
               />
             </View>
           </View>
