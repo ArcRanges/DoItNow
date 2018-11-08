@@ -6,130 +6,67 @@ import {
   Text,
   View,
   Alert,
-  TouchableHighlight,
-  Dimensions,
+  ListView,
+  TouchableOpacity,
+  AsyncStorage,
   ScrollView,
   RefreshControl,
-  AsyncStorage
+  TouchableHighlight,
+  Dimensions,
+
 } from 'react-native';
 
 import { WebBrowser } from 'expo';
 
 import { Header, Icon, Button, FormLabel, FormInput, FormValidationMessage } from 'react-native-elements';
 import DateTimePicker from 'react-native-modal-datetime-picker';
+import { SwipeListView, SwipeRow } from 'react-native-swipe-list-view';
 
 import Modal from 'react-native-modal';
-import Accordion from 'react-native-collapsible/Accordion';
+import AccordionView from './views/AccordionView';
 
 import { MonoText } from '../components/StyledText';
 
 const width = Dimensions.get('window').width;
 const height = Dimensions.get('window').height;
 
-const SECTIONS = [
-  {
-    title: 'Home',
-    content: 'Finish cleaning the kitchen'
-  },
-  {
-    title: 'Work',
-    content: 'Finish Welcome page'
-  }
-];
 
-class AccordionView extends React.Component {
-
-  constructor(props) {
-    super(props);
-
-    this.state = {
-      sections: [],
-      activeSections: [],
-      refreshing: false,
-    }
-  }
-
-  componentWillMount() {
-
-    this.loadEntries();
-  }
-
-  loadEntries = async () => {
-
-    await AsyncStorage.getItem('entries').then((data) => {
-      // console.log(JSON.parse(data));
-
-      if (data) {
-        console.log(JSON.parse(data));
-        this.setState({
-          sections: JSON.parse(data),
-        });
-      }
-
-    }).catch((err) => {
-      console.log('error loading entries ' + err);
-    });
-  }
-
-  _renderSectionTitle = section => {
-    return (
-      <View style={styles.content}>
-        <Text>{section.location}</Text>
-      </View>
-    );
-  };
-
-  _renderHeader = section => {
-    return (
-      <View style={styles.header}>
-        <Text style={styles.headerText}>{section.location}</Text>
-      </View>
-    );
-  };
-
-  _renderContent = section => {
-    return (
-      <View style={styles.content}>
-        <Text>Due: {section.date}</Text>
-        <Text>Notes: {section.description}</Text>
-      </View>
-    );
-  };
-
-  _updateSections = activeSections => {
-    this.setState({ activeSections });
-  };
-
-  render() {
-    return (
-      <ScrollView
-        refreshControl={
-          <RefreshControl
-            refreshing={this.props.refreshing}
-            onRefresh={this.loadEntries}
-          />
-          }
-        >
-        <Accordion
-          sections={this.state.sections}
-          activeSections={this.state.activeSections}
-          renderHeader={this._renderHeader}
-          renderContent={this._renderContent}
-          onChange={this._updateSections}
-        />
-      </ScrollView>
-    );
-  }
-}
 export default class HomeScreen extends React.Component {
   static navigationOptions = {
     header: null,
   };
 
+  componentWillMount() {
+    // AsyncStorage.clear();
+    this.loadEntries();
+  }
+
+  componentDidMount() {
+    this._updateCurrentID();
+  }
+
+  _updateCurrentID = async () => {
+    await AsyncStorage.getItem('entries').then((data) => {
+
+      if (data && data.length > 0) {
+        const DATA = JSON.parse(data);
+        this.setState({
+          curr_id: DATA[DATA.length - 1].id,
+        });
+      }
+
+    }).catch((err) => {
+      console.log(err);
+    });
+  }
+
   constructor(props){
     super(props);
+    this.ds = new ListView.DataSource({rowHasChanged: (r1, r2) => r1 !== r2});
+
     this.state = {
       modalVisible: false,
+      curr_id: 0,
 
       entries: [],
       error: ['','','',''],
@@ -142,10 +79,44 @@ export default class HomeScreen extends React.Component {
       description: '',
 
       refreshing: false,
+
+      listType: 'FlatList',
+			listViewData: Array(20).fill('').map((_,i) => ({key: `${i}`, text: `item #${i}`})),
+			sectionListData: Array(5).fill('').map((_,i) => ({title: `title${i + 1}`, data: [...Array(5).fill('').map((_, j) => ({key: `${i}.${j}`, text: `item #${j}`}))]})),
     }
 
     this.addNewEntry = this.addNewEntry.bind(this);
   }
+
+  closeRow(rowMap, rowKey) {
+		if (rowMap[rowKey]) {
+			rowMap[rowKey].closeRow();
+		}
+	}
+
+	deleteRow(rowMap, rowKey) {
+		this.closeRow(rowMap, rowKey);
+		const newData = [...this.state.listViewData];
+		const prevIndex = this.state.listViewData.findIndex(item => item.key === rowKey);
+		newData.splice(prevIndex, 1);
+		this.setState({listViewData: newData});
+	}
+
+	deleteSectionRow(rowMap, rowKey) {
+		this.closeRow(rowMap, rowKey);
+		var [section, row] = rowKey.split('.');
+		const newData = [...this.state.sectionListData];
+		const prevIndex = this.state.sectionListData[section].data.findIndex(item => item.key === rowKey);
+		newData[section].data.splice(prevIndex, 1);
+		this.setState({sectionListData: newData});
+	}
+
+	onRowDidOpen = (rowKey, rowMap) => {
+		console.log('This row opened', rowKey);
+		setTimeout(() => {
+			this.closeRow(rowMap, rowKey);
+		}, 2000);
+	}
 
   addNewEntry() {
     this.setState({
@@ -154,13 +125,54 @@ export default class HomeScreen extends React.Component {
     });
   }
 
+  _deleteEntry = async (id) => {
+    console.log('id selected: ' + id);
+    // get entries
+    // parse to JSON
+    // splice it
+    const currentEntries = await AsyncStorage.getItem('entries');
+
+    let newEntries = JSON.parse(currentEntries);
+
+    if ( !newEntries ) {
+      newEntries = [];
+    }
+
+    var index;
+
+    for (let i = 0; i < newEntries.length; i++) {
+      if (newEntries[i].id == id) {
+        console.log('found entry :  ' + id);
+        index = i;
+      }
+    }
+
+    newEntries.splice(index, 1);
+
+    if (newEntries.length > 0) {
+      await AsyncStorage.setItem('entries', JSON.stringify(newEntries)).then(()=> {
+        console.log('deleted item id ' + id);
+        this.loadEntries();
+        this._updateCurrentID();
+      }).catch((err) => {
+        console.log(err);
+      });
+    } else {
+      AsyncStorage.clear(); //
+      this.loadEntries();
+    }
+
+  }
+
   _saveEntry = async () => {
     this.setState({
       refreshing: true
     });
 
     const entry = {
+      'id': this.state.curr_id,
       'date': this.state.pickedDate,
+      'date_created': Date.now(),
       'title:': this.state.title,
       'location': this.state.location,
       'description': this.state.description
@@ -180,21 +192,42 @@ export default class HomeScreen extends React.Component {
 
     await AsyncStorage.setItem('entries', JSON.stringify(newEntries)).then(()=> {
       console.log('Successfully saved entry');
-      setTimeout(()=> {
-        this.setState({
-          pickedDate: '',
-          title: '',
-          description: '',
-          location: '',
-          converted_date: '',
-          modalVisible: false,
-          refreshing: false,
-        });
-      },1000);
 
-
+      this.setState({
+        curr_id: this.state.curr_id + 1,
+        pickedDate: '',
+        title: '',
+        description: '',
+        location: '',
+        converted_date: '',
+        modalVisible: false,
+        refreshing: false,
+      });
+      this.loadEntries();
     }).catch(()=> {
       console.log('There was an error saving the entry');
+    });
+  }
+
+  loadEntries = async () => {
+
+    await AsyncStorage.getItem('entries').then((data) => {
+      // console.log(JSON.parse(data));
+
+      if (data && data.length > 0) {
+        let pdata = JSON.parse(data);
+        console.log(pdata[pdata.length-1].id);
+        this.setState({
+          entries: pdata,
+        });
+      } else {
+        this.setState({
+          entries: []
+        });
+      }
+
+    }).catch((err) => {
+      console.log('error loading entries ' + err);
     });
   }
 
@@ -233,7 +266,46 @@ export default class HomeScreen extends React.Component {
                             onPress={() => this.addNewEntry()} />}
         />
 
-        <AccordionView refreshing={this.state.refreshing}/>
+        {/* <AccordionView
+          refreshing={this.state.refreshing}
+          loadEntries={this.loadEntries}
+          entries={this.state.entries}
+        /> */}
+
+        <ScrollView
+          refreshControl={
+            <RefreshControl
+              refreshing={this.state.refreshing}
+              onRefresh={this.state.loadEntries}
+            />
+          }
+        >
+        { this.state.entries.map((entry) => {
+          return (
+            <View key={entry.date_created} style={styles.standalone}>
+    					<SwipeRow
+    						leftOpenValue={75}
+    						rightOpenValue={-75}
+    					>
+    						<View style={styles.standaloneRowBack}>
+    							<Text style={styles.backTextWhite}>Left</Text>
+                  <TouchableOpacity onPress={()=> this._deleteEntry(entry.id.toString())}>
+                    <Text style={styles.backTextWhite}>Remove</Text>
+                  </TouchableOpacity>
+
+    						</View>
+    						<View style={styles.standaloneRowFront}>
+    							<Text>{entry.id} {entry.location}</Text>
+    						</View>
+    					</SwipeRow>
+    				</View>
+          )
+        })
+      }
+      </ScrollView>
+
+
+
 
         <Modal
           isVisible={this.state.modalVisible}
@@ -257,9 +329,9 @@ export default class HomeScreen extends React.Component {
                 onCancel={this._hideDateTimePicker}
               />
               <FormValidationMessage>{this.state.error[0]}</FormValidationMessage>
-              <FormLabel>Title</FormLabel>
+              {/* <FormLabel>Title</FormLabel>
               <FormInput inputStyle={styles.inputStyle} onChangeText={(input)=> this.setState({title: input})}/>
-              <FormValidationMessage>{this.state.error[1]}</FormValidationMessage>
+              <FormValidationMessage>{this.state.error[1]}</FormValidationMessage> */}
               <FormLabel>Location</FormLabel>
               <FormInput inputStyle={styles.inputStyle} onChangeText={(input)=> this.setState({location: input})}/>
               <FormValidationMessage>{this.state.error[2]}</FormValidationMessage>
@@ -326,19 +398,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center'
   },
-  header: {
-   backgroundColor: '#F5FCFF',
-   padding: 10,
-  },
-  headerText: {
-   textAlign: 'left',
-   fontSize: 16,
-   fontWeight: '500',
-  },
-  content: {
-   padding: 20,
-   backgroundColor: '#fff',
-  },
+  standalone: {
+    marginBottom: 2,
+	},
+	standaloneRowFront: {
+		alignItems: 'center',
+		backgroundColor: '#CCC',
+		justifyContent: 'center',
+		height: 50,
+	},
+	standaloneRowBack: {
+		alignItems: 'center',
+		backgroundColor: '#8BC645',
+		flex: 1,
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		padding: 15
+	},
+	backTextWhite: {
+		color: '#FFF'
+	},
   modalContainer: {
     flex: 1,
     backgroundColor: 'white',
