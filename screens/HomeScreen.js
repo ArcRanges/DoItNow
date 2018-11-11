@@ -16,8 +16,6 @@ import {
 
 } from 'react-native';
 
-import { WebBrowser } from 'expo';
-
 import { Header, Icon, Button, FormLabel, FormInput, FormValidationMessage } from 'react-native-elements';
 import DateTimePicker from 'react-native-modal-datetime-picker';
 import { SwipeListView, SwipeRow } from 'react-native-swipe-list-view';
@@ -39,9 +37,6 @@ export default class HomeScreen extends React.Component {
   componentWillMount() {
     // AsyncStorage.clear();
     this.loadEntries();
-  }
-
-  componentDidMount() {
     this._updateCurrentID();
   }
 
@@ -51,7 +46,7 @@ export default class HomeScreen extends React.Component {
       if (data && data.length > 0) {
         const DATA = JSON.parse(data);
         this.setState({
-          curr_id: DATA[DATA.length - 1].id,
+          curr_id: DATA[DATA.length - 1].id + 1,
         });
       }
 
@@ -212,7 +207,7 @@ export default class HomeScreen extends React.Component {
   loadEntries = async () => {
 
     await AsyncStorage.getItem('entries').then((data) => {
-      // console.log(JSON.parse(data));
+      console.log(JSON.parse(data));
 
       if (data && data.length > 0) {
         let pdata = JSON.parse(data);
@@ -266,12 +261,6 @@ export default class HomeScreen extends React.Component {
                             onPress={() => this.addNewEntry()} />}
         />
 
-        {/* <AccordionView
-          refreshing={this.state.refreshing}
-          loadEntries={this.loadEntries}
-          entries={this.state.entries}
-        /> */}
-
         <ScrollView
           refreshControl={
             <RefreshControl
@@ -284,18 +273,19 @@ export default class HomeScreen extends React.Component {
           return (
             <View key={entry.date_created} style={styles.standalone}>
     					<SwipeRow
-    						leftOpenValue={75}
+    						disableRightSwipe={true}
     						rightOpenValue={-75}
     					>
     						<View style={styles.standaloneRowBack}>
-    							<Text style={styles.backTextWhite}>Left</Text>
+    							{/* <Text style={styles.backTextWhite}>Left</Text> */}
+                  <Text style={styles.swipeRightText}>Left Hidden</Text>
                   <TouchableOpacity onPress={()=> this._deleteEntry(entry.id.toString())}>
-                    <Text style={styles.backTextWhite}>Remove</Text>
+                    <Text style={styles.swipeRightText}>Remove</Text>
                   </TouchableOpacity>
 
     						</View>
     						<View style={styles.standaloneRowFront}>
-    							<Text>{entry.id} {entry.location}</Text>
+    							<Text>{entry.location} - {entry.description}</Text>
     						</View>
     					</SwipeRow>
     				</View>
@@ -303,10 +293,6 @@ export default class HomeScreen extends React.Component {
         })
       }
       </ScrollView>
-
-
-
-
         <Modal
           isVisible={this.state.modalVisible}
           onBackdropPress={()=> this.setState({modalVisible: !this.state.modalVisible})}
@@ -377,15 +363,6 @@ export default class HomeScreen extends React.Component {
     }
   }
 
-  _handleLearnMorePress = () => {
-    WebBrowser.openBrowserAsync('https://docs.expo.io/versions/latest/guides/development-mode');
-  };
-
-  _handleHelpPress = () => {
-    WebBrowser.openBrowserAsync(
-      'https://docs.expo.io/versions/latest/guides/up-and-running.html#can-t-see-your-changes'
-    );
-  };
 }
 
 const styles = StyleSheet.create({
@@ -409,26 +386,23 @@ const styles = StyleSheet.create({
 	},
 	standaloneRowBack: {
 		alignItems: 'center',
-		backgroundColor: '#8BC645',
+		backgroundColor: 'rgba(255, 59, 48, 1)',
 		flex: 1,
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		padding: 15
 	},
-	backTextWhite: {
+	swipeRightText: {
 		color: '#FFF'
 	},
   modalContainer: {
     flex: 1,
     backgroundColor: 'white',
     alignItems: 'center',
-    borderRadius: 10,
   },
   modalHeader: {
     flex: 1,
     maxHeight: 40,
-    borderTopLeftRadius: 10,
-    borderTopRightRadius: 10,
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
