@@ -15,6 +15,7 @@ import {
   Dimensions,
 
 } from 'react-native';
+import { Notifications, Permissions, Constants } from 'expo';
 
 import { Header, Icon, Button, FormLabel, FormInput, FormValidationMessage } from 'react-native-elements';
 import DateTimePicker from 'react-native-modal-datetime-picker';
@@ -38,6 +39,29 @@ export default class HomeScreen extends React.Component {
     // AsyncStorage.clear();
     this.loadEntries();
     this._updateCurrentID();
+
+    const localNotification = {
+      title: 'Test notification title',
+      body: 'Test notification body',
+      sound: true
+    }
+
+    let t = new Date();
+    t.setSeconds(t.getSeconds() + 1);
+
+    const scheduleOpts = {
+      time: t,
+      repeat: 'minute'
+    };
+
+    // Notifications.scheduleLocalNotificationAsync(localNotification, scheduleOpts);
+  }
+
+  async componentDidMount() {
+    let result = await Permissions.askAsync(Permissions.NOTIFICATIONS);
+    if (Constants.isDevice && result.status === 'granted') {
+      console.log('Notifications permissions granted');
+    }
   }
 
   _updateCurrentID = async () => {
