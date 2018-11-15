@@ -99,9 +99,6 @@ export default class HomeScreen extends React.Component {
 
       refreshing: false,
 
-      listType: 'FlatList',
-			listViewData: Array(20).fill('').map((_,i) => ({key: `${i}`, text: `item #${i}`})),
-			sectionListData: Array(5).fill('').map((_,i) => ({title: `title${i + 1}`, data: [...Array(5).fill('').map((_, j) => ({key: `${i}.${j}`, text: `item #${j}`}))]})),
     }
 
     this.addNewEntry = this.addNewEntry.bind(this);
@@ -111,14 +108,6 @@ export default class HomeScreen extends React.Component {
 		if (rowMap[rowKey]) {
 			rowMap[rowKey].closeRow();
 		}
-	}
-
-	deleteRow(rowMap, rowKey) {
-		this.closeRow(rowMap, rowKey);
-		const newData = [...this.state.listViewData];
-		const prevIndex = this.state.listViewData.findIndex(item => item.key === rowKey);
-		newData.splice(prevIndex, 1);
-		this.setState({listViewData: newData});
 	}
 
 	deleteSectionRow(rowMap, rowKey) {
@@ -144,11 +133,22 @@ export default class HomeScreen extends React.Component {
     });
   }
 
+  _updateEntry = async (id) => {
+    const currentEntries = await AsyncStorage.getItem('entries');
+    let entries = JSON.parse(currentEntries);
+
+    entries.find(entry => entry.id == id).isFinished = true;
+    console.log(entries);
+
+    await AsyncStorage.setItem('entries', JSON.stringify(entries)).then(()=> {
+      console.log('Successfully updated entry');
+      this.loadEntries();
+    }).catch(()=> {
+      console.log('There was an error updating the entry');
+    });
+  }
+
   _deleteEntry = async (id) => {
-    console.log('id selected: ' + id);
-    // get entries
-    // parse to JSON
-    // splice it
     const currentEntries = await AsyncStorage.getItem('entries');
 
     let newEntries = JSON.parse(currentEntries);
@@ -157,15 +157,7 @@ export default class HomeScreen extends React.Component {
       newEntries = [];
     }
 
-    var index;
-
-    for (let i = 0; i < newEntries.length; i++) {
-      if (newEntries[i].id == id) {
-        console.log('found entry :  ' + id);
-        index = i;
-      }
-    }
-
+    var index = newEntries.findIndex(entry => entry.id == id);
     newEntries.splice(index, 1);
 
     if (newEntries.length > 0) {
@@ -194,7 +186,8 @@ export default class HomeScreen extends React.Component {
       'date_created': Date.now(),
       'title:': this.state.title,
       'location': this.state.location,
-      'description': this.state.description
+      'description': this.state.description,
+      'isFinished': false,
     }
 
     const currentEntries = await AsyncStorage.getItem('entries');
@@ -293,18 +286,26 @@ export default class HomeScreen extends React.Component {
             />
           }
         >
-        { this.state.entries.map((entry) => {
+        { this.state.entries.filter(entry => !entry.isFinished).map((entry) => {
           return (
             <View key={entry.date_created} style={styles.standalone}>
     					<SwipeRow
-    						disableRightSwipe={true}
+    						disableRightSwipe={false}
     						rightOpenValue={-75}
+                leftOpenValue={85}
+                directionalDistanceChangeThreshold={75}
     					>
     						<View style={styles.standaloneRowBack}>
     							{/* <Text style={styles.backTextWhite}>Left</Text> */}
-                  <Text style={styles.swipeRightText}>Left Hidden</Text>
-                  <TouchableOpacity onPress={()=> this._deleteEntry(entry.id.toString())}>
-                    <Text style={styles.swipeRightText}>Remove</Text>
+                  <TouchableOpacity
+                    style={styles.backLeftBtn}
+                    onPress={()=> this._updateEntry(entry.id.toString())}>
+                    <Text style={styles.textWhite}>Done</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.backRightBtn}
+                    onPress={()=> this._deleteEntry(entry.id.toString())}>
+                    <Text style={styles.textWhite}>Remove</Text>
                   </TouchableOpacity>
 
     						</View>
@@ -410,15 +411,36 @@ const styles = StyleSheet.create({
 	},
 	standaloneRowBack: {
 		alignItems: 'center',
-		backgroundColor: 'rgba(255, 59, 48, 1)',
 		flex: 1,
 		flexDirection: 'row',
 		justifyContent: 'space-between',
-		padding: 15
+
 	},
-	swipeRightText: {
-		color: '#FFF'
+  backLeftBtn: {
+    flex: 1,
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 85,
+    height: 50,
+    backgroundColor: 'blue',
+
+  },
+  backRightBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'absolute',
+    width: 75,
+    height: 50,
+    backgroundColor: 'red',
+    top: 0,
+    right: 0,
+    bottom: 0,
 	},
+  textWhite: {
+  	color: '#FFF'
+  },
   modalContainer: {
     flex: 1,
     backgroundColor: 'white',
